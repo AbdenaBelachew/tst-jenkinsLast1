@@ -53,14 +53,14 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat """
-                    echo Archiving frontend...
-                    tar -czf frontend.tar.gz -C frontend/dist .
+                    echo Creating frontend directory...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo mkdir -p ${env.FRONTEND_PATH} && sudo chown %SSH_USER%:%SSH_USER% ${env.FRONTEND_PATH}"
                     
-                    echo Uploading frontend archive...
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no frontend.tar.gz %SSH_USER%@${env.SERVER_HOST}:/tmp/frontend.tar.gz
+                    echo Uploading frontend dist...
+                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\frontend\\dist\\." %SSH_USER%@${env.SERVER_HOST}:${env.FRONTEND_PATH}
                     
-                    echo Extracting and Reloading Nginx...
-                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo mkdir -p ${env.FRONTEND_PATH} && sudo tar -xzf /tmp/frontend.tar.gz -C ${env.FRONTEND_PATH} && sudo rm /tmp/frontend.tar.gz && sudo nginx -s reload"
+                    echo Reloading Nginx...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo nginx -s reload"
                     """
                 }
             }
@@ -70,14 +70,14 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat """
-                    echo Archiving backend (excluding node_modules)...
-                    tar --exclude=node_modules -czf backend.tar.gz -C backend .
+                    echo Creating backend directory...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.BACKEND_PATH}"
                     
-                    echo Uploading backend archive...
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no backend.tar.gz %SSH_USER%@${env.SERVER_HOST}:/tmp/backend.tar.gz
+                    echo Uploading backend files...
+                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\backend\\." %SSH_USER%@${env.SERVER_HOST}:${env.BACKEND_PATH}
                     
-                    echo Extracting and Restarting PM2...
-                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.BACKEND_PATH} && tar -xzf /tmp/backend.tar.gz -C ${env.BACKEND_PATH} && rm /tmp/backend.tar.gz && cd ${env.BACKEND_PATH} && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})"
+                    echo Restarting Backend with PM2...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "cd ${env.BACKEND_PATH} && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})"
                     """
                 }
             }
