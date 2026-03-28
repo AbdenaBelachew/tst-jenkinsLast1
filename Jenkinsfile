@@ -4,7 +4,7 @@ pipeline {
     environment {
         // --- CONFIGURE THESE IN JENKINS ---
         SERVER_USER      = 'Abdenab' // e.g., 'ubuntu' or 'root'
-        SERVER_HOST      = '[10.8.101.33'
+        SERVER_HOST      = '10.8.101.33'
         SSH_CREDS_ID     = 'linux-ssh-creds' // The ID of credentials you added to Jenkins
         
         FRONTEND_PATH    = '/var/www/myapp'
