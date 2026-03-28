@@ -50,14 +50,14 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat """
-                    echo Creating frontend directory in home...
-                    ssh -i "%SSH_KEY%" -T -o StrictHostKeyChecking=no -o BatchMode=yes %SSH_USER%@${env.SERVER_HOST} "mkdir -p /home/%SSH_USER%/myapp"
-                    
+                    echo Creating frontend directory...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.FRONTEND_PATH}"
+
                     echo Uploading frontend dist...
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\frontend\\dist\\." %SSH_USER%@${env.SERVER_HOST}:/home/%SSH_USER%/myapp
-                    
+                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\frontend\\dist\\*" %SSH_USER%@${env.SERVER_HOST}:${env.FRONTEND_PATH}
+
                     echo Reloading Nginx...
-                    ssh -i "%SSH_KEY%" -T -o StrictHostKeyChecking=no -o BatchMode=yes %SSH_USER%@${env.SERVER_HOST} "sudo nginx -s reload"
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo nginx -s reload"
                     """
                 }
             }
@@ -67,19 +67,18 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat """
-                    echo Creating backend directory in home...
-                    ssh -i "%SSH_KEY%" -T -o StrictHostKeyChecking=no -o BatchMode=yes %SSH_USER%@${env.SERVER_HOST} "mkdir -p /home/%SSH_USER%/backend"
-                    
+                    echo Creating backend directory...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.BACKEND_PATH}"
+
                     echo Uploading backend files...
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\backend\\." %SSH_USER%@${env.SERVER_HOST}:/home/%SSH_USER%/backend
-                    
-                    echo Restarting Backend with PM2...
-                    ssh -i "%SSH_KEY%" -T -o StrictHostKeyChecking=no -o BatchMode=yes %SSH_USER%@${env.SERVER_HOST} "cd /home/%SSH_USER%/backend && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})"
+                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\backend\\*" %SSH_USER%@${env.SERVER_HOST}:${env.BACKEND_PATH}
+
+                    echo Restarting backend with PM2...
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "cd ${env.BACKEND_PATH} && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})"
                     """
                 }
             }
         }
-
     }
 
     post {
