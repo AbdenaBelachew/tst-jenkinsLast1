@@ -2,10 +2,14 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_SITE = 'Default Web Site'
-        FRONTEND_APP  = 'myapp'
-        FRONTEND_PATH = 'C:\\inetpub\\wwwroot\\myapp'
-        BACKEND_PATH  = 'C:\\inetpub\\backend\\mybackend'
+        // --- CONFIGURE THESE IN JENKINS ---
+        SERVER_USER      = 'Abdenab' // e.g., 'ubuntu' or 'root'
+        SERVER_HOST      = '[IP_ADDRESS]'   // e.g., '192.168.1.100'
+        SSH_CREDS_ID     = 'linux-ssh-creds' // The ID of credentials you added to Jenkins
+        
+        FRONTEND_PATH    = '/var/www/myapp'
+        BACKEND_PATH     = '/home/Abdenab/backend'
+        BACKEND_PROCESS_NAME = 'my-backend'
     }
 
     tools {
@@ -17,7 +21,8 @@ pipeline {
         stage('Install Frontend Dependencies') {
             steps {
                 dir('frontend') {
-                    bat 'npm install'
+                    // Use bat or sh depending on where Jenkins agent runs
+                    bat 'npm install' 
                 }
             }
         }
@@ -46,79 +51,29 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                powershell '''
-                $source = "${env:WORKSPACE}\\frontend\\dist"
-                $destination = $env:FRONTEND_PATH
-
-                # Clean up old deployment and web.config (to avoid 500 errors)
-                if (Test-Path "$destination\\web.config") {
-                    Remove-Item "$destination\\web.config" -Force
+                withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
+                    bat """
+                    echo Uploading frontend dist...
+                    scp -i %SSH_KEY% -o StrictHostKeyChecking=no -r frontend/dist/* %SSH_USER%@${env.SERVER_HOST}:${env.FRONTEND_PATH}
+                    
+                    echo Reloading Nginx...
+                    ssh -i %SSH_KEY% -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo nginx -s reload"
+                    """
                 }
-
-                if (!(Test-Path $destination)) {
-                    New-Item -Path $destination -ItemType Directory -Force
-                }
-                
-                Copy-Item -Path $source\\* -Destination $destination -Recurse -Force
-                Write-Host "Frontend files copied to $destination"
-
-                # Manage IIS App safely
-                Import-Module WebAdministration
-                $site = $env:FRONTEND_SITE
-                $appFolder = $env:FRONTEND_APP
-                $physPath = $env:FRONTEND_PATH
-                $appPath = "IIS:\\Sites\\$site\\$appFolder"
-
-                if (-Not (Test-Path $appPath)) {
-                    New-WebApplication -Name $appFolder -Site $site -PhysicalPath $physPath -ApplicationPool "DefaultAppPool"
-                    Write-Host "Created IIS Application: $appPath"
-                } else {
-                    # Use Set-WebConfigurationProperty for more reliable updates (avoids "Value cannot be null" provider bug)
-                    Set-WebConfigurationProperty -filter "system.applicationHost/sites/site[@name='$site']/application[@path='/$appFolder']/virtualDirectory[@path='/']" -Name "physicalPath" -Value $physPath
-                    Write-Host "IIS Application already exists, updated physicalPath for: $appPath"
-                }
-                '''
             }
         }
 
         stage('Deploy Backend') {
             steps {
-                powershell '''
-                $source = "${env:WORKSPACE}\\backend"
-                $destination = $env:BACKEND_PATH
-                $port = 3001
-
-                # Clean up existing processes on port 3001
-                $processId = (Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue).OwningProcess
-                if ($processId) {
-                    Write-Host "Killing process on port $port (PID: $processId)..."
-                    Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+                withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
+                    bat """
+                    echo Uploading backend files...
+                    scp -i %SSH_KEY% -o StrictHostKeyChecking=no -r backend/* %SSH_USER%@${env.SERVER_HOST}:${env.BACKEND_PATH}
+                    
+                    echo Restarting Backend with PM2...
+                    ssh -i %SSH_KEY% -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "cd ${env.BACKEND_PATH} && npm install --production && pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME}"
+                    """
                 }
-
-                if (!(Test-Path $destination)) {
-                    New-Item -Path $destination -ItemType Directory -Force
-                }
-                Copy-Item -Path $source\\* -Destination $destination -Recurse -Force
-
-                # Prevent Jenkins from killing the process
-                $env:BUILD_ID = "dontKillMe"
-
-                # Start backend and redirect logs to a file for debugging
-                Write-Host "Starting backend..."
-                Start-Process "node" -ArgumentList "index.js" -WorkingDirectory $destination -RedirectStandardOutput "$destination\\backend.log" -RedirectStandardError "$destination\\backend_error.log"
-                
-                # Verify if port 3001 is now listening
-                Start-Sleep -Seconds 5
-                if (Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue) {
-                    Write-Host "SUCCESS: Backend is listening on port $port!"
-                } else {
-                    Write-Host "ERROR: Backend failed to bind to port $port. Check $destination\\backend_error.log for details."
-                    if (Test-Path "$destination\\backend_error.log") {
-                        Get-Content "$destination\\backend_error.log"
-                    }
-                    exit 1
-                }
-                '''
             }
         }
 
@@ -126,10 +81,11 @@ pipeline {
 
     post {
         success {
-            echo 'Full Stack CI/CD pipeline finished successfully!'
+            echo 'Full Stack Linux Deployment Successful!'
         }
         failure {
-            echo 'Pipeline failed. Check logs.'
+            echo 'Deployment failed. Check Jenkins logs for details.'
         }
     }
 }
+
