@@ -51,10 +51,14 @@ pipeline {
                     )
                 ]) {
                     bat """
+                    echo ===== FIX SSH KEY PERMISSIONS =====
+                    icacls "%SSH_KEY%" /inheritance:r
+                    icacls "%SSH_KEY%" /grant:r "SYSTEM:R"
+
                     echo ===== TEST SSH CONNECTION =====
                     ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "echo SSH SUCCESS" || exit 1
 
-                    echo ===== CREATE FRONTEND DIR =====
+                    echo ===== CREATE FRONTEND DIRECTORY =====
                     ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.FRONTEND_PATH}" || exit 1
 
                     echo ===== UPLOAD FRONTEND =====
@@ -77,13 +81,17 @@ pipeline {
                     )
                 ]) {
                     bat """
-                    echo ===== CREATE BACKEND DIR =====
+                    echo ===== FIX SSH KEY PERMISSIONS =====
+                    icacls "%SSH_KEY%" /inheritance:r
+                    icacls "%SSH_KEY%" /grant:r "SYSTEM:R"
+
+                    echo ===== CREATE BACKEND DIRECTORY =====
                     ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.BACKEND_PATH}" || exit 1
 
                     echo ===== UPLOAD BACKEND =====
                     scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" -r "%WORKSPACE%\\backend\\." %SSH_USER%@${env.SERVER_HOST}:${env.BACKEND_PATH} || exit 1
 
-                    echo ===== INSTALL & RESTART BACKEND =====
+                    echo ===== INSTALL & START BACKEND =====
                     ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} ^
                     "cd ${env.BACKEND_PATH} && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})" || exit 1
                     """
@@ -97,7 +105,7 @@ pipeline {
             echo '✅ Deployment Successful!'
         }
         failure {
-            echo '❌ Deployment Failed! Check above logs.'
+            echo '❌ Deployment Failed! Check logs above.'
         }
     }
 }
