@@ -54,7 +54,7 @@ pipeline {
                 withCredentials([sshUserPrivateKey(credentialsId: "${env.SSH_CREDS_ID}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat """
                     echo Creating frontend directory...
-                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "sudo mkdir -p ${env.FRONTEND_PATH} && sudo chown %SSH_USER%:%SSH_USER% ${env.FRONTEND_PATH}"
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.FRONTEND_PATH}"
                     
                     echo Uploading frontend dist...
                     scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no -r "%WORKSPACE%\\frontend\\dist\\." %SSH_USER%@${env.SERVER_HOST}:${env.FRONTEND_PATH}
