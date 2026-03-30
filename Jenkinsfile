@@ -2,15 +2,16 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER = 'abdenab'
-        REMOTE_HOST = '10.8.101.33'
-        DEPLOY_PATH = '/home/abdenab/myapp'
+        DEPLOY_USER = "abdenab"
+        DEPLOY_HOST = "10.8.101.33"
+        DEPLOY_PATH = "/home/abdenab/myapp"
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout SCM') {
             steps {
-                git branch: 'main', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
+                git branch: 'main',
+                    url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
             }
         }
 
@@ -40,21 +41,27 @@ pipeline {
 
         stage('Deploy Frontend and Backend') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key',
-                                                  keyFileVariable: 'SSH_KEY_FILE',
-                                                  usernameVariable: 'SSH_USER')]) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $SSH_USER@$REMOTE_HOST "mkdir -p $DEPLOY_PATH && rm -rf $DEPLOY_PATH/*"
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r frontend/dist/* $SSH_USER@$REMOTE_HOST:$DEPLOY_PATH/
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r backend/* $SSH_USER@$REMOTE_HOST:$DEPLOY_PATH/
-                    '''
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'abdenab_ssh_key',
+                    keyFileVariable: 'SSH_KEY_FILE',
+                    usernameVariable: 'SSH_USER'
+                )]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i \$SSH_KEY_FILE \$DEPLOY_USER@\$DEPLOY_HOST 'mkdir -p \$DEPLOY_PATH && rm -rf \$DEPLOY_PATH/*'
+                        scp -i \$SSH_KEY_FILE -r frontend/dist/* \$DEPLOY_USER@\$DEPLOY_HOST:\$DEPLOY_PATH/
+                        scp -i \$SSH_KEY_FILE -r backend/* \$DEPLOY_USER@\$DEPLOY_HOST:\$DEPLOY_PATH/
+                    """
                 }
             }
         }
     }
 
     post {
-        success { echo "✅ Deployment Successful!" }
-        failure { echo "❌ Deployment Failed! Check logs above." }
+        success {
+            echo "✅ Deployment succeeded!"
+        }
+        failure {
+            echo "❌ Deployment failed! Check logs above."
+        }
     }
 }
