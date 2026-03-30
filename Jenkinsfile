@@ -1,58 +1,53 @@
 pipeline {
     agent any
-
+    
     stages {
-        stage('Checkout Code') {
+        
+        stage('Clone Source') {
             steps {
-                git branch: 'main', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
+                // Clone your GitHub repository
+                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
             }
         }
-
-        stage('Install Frontend Dependencies') {
+        
+        stage('Build / Prepare') {
             steps {
-                dir('frontend') {
-                    sh 'npm install'
+                echo "Repository cloned. You can add build steps here if needed."
+                // For example, if this repo contains a build script, you can run it.
+                // sh 'chmod +x build.sh && ./build.sh'
+            }
+        }
+        
+        stage('Deploy to Ubuntu') {
+            steps {
+                // Use the SSH credentials you added in Jenkins
+                sshagent(['linux-ssh-creds']) {
+                    // Create deploy directory on the target server
+                    sh '''
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "mkdir -p ~/deploy"
+                    '''
+                    
+                    // Copy the repository contents from Jenkins to the target machine
+                    sh '''
+                      scp -o StrictHostKeyChecking=no -r $WORKSPACE/* abdenab@10.8.101.33:~/deploy/
+                    '''
+                    
+                    // Run a remote command after deployment (optional)
+                    sh '''
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "echo Deployment from Jenkins completed."
+                    '''
                 }
             }
         }
-
-        stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'npx vite build'
-                }
-            }
-        }
-
-        stage('Install Backend Dependencies') {
-            steps {
-                dir('backend') {
-                    sh 'npm install'
-                }
-            }
-        }
-
-        stage('Deploy Frontend and Backend') {
-            steps {
-                withCredentials([sshUserPrivateKey(
-                    credentialsId: 'ssh_key',
-                    keyFileVariable: 'SSH_KEY_FILE',
-                    usernameVariable: 'SSH_USER'
-                )]) {
-                    sh """
-                    echo "Deploying to 10.8.101.33..."
-                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" "$SSH_USER@10.8.101.33" "mkdir -p '/home/abdenab/myapp' && rm -rf '/home/abdenab/myapp/*'"
-                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" -r /var/lib/jenkins/workspace/test\\ one/frontend/dist/* "$SSH_USER@10.8.101.33:/home/abdenab/myapp/frontend/"
-                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" -r /var/lib/jenkins/workspace/test\\ one/backend/* "$SSH_USER@10.8.101.33:/home/abdenab/myapp/backend/"
-                    echo "Deployment completed successfully!"
-                    """
-                }
-            }
-        }
+        
     }
-
+    
     post {
-        success { echo '✅ Pipeline completed successfully!' }
-        failure { echo '❌ Deployment failed! Check logs above.' }
+        success {
+            echo 'Pipeline completed successfully.'
+        }
+        failure {
+            echo 'Pipeline failed.'
+        }
     }
 }
