@@ -11,16 +11,12 @@ pipeline {
         BACKEND_PROCESS_NAME = 'my-backend'
     }
 
-    tools {
-        nodejs 'node18'
-    }
-
     stages {
 
         stage('Install Frontend Dependencies') {
             steps {
                 dir('frontend') {
-                    bat 'npm install'
+                    sh 'npm install'
                 }
             }
         }
@@ -28,7 +24,7 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
-                    bat 'npm run build'
+                    sh 'npm run build'
                 }
             }
         }
@@ -36,7 +32,7 @@ pipeline {
         stage('Install Backend Dependencies') {
             steps {
                 dir('backend') {
-                    bat 'npm install'
+                    sh 'npm install'
                 }
             }
         }
@@ -50,23 +46,19 @@ pipeline {
                         usernameVariable: 'SSH_USER'
                     )
                 ]) {
-                    bat """
-                    echo ===== FIX SSH KEY PERMISSIONS =====
-                    icacls "%SSH_KEY%" /inheritance:r
-                    icacls "%SSH_KEY%" /grant:r "SYSTEM:R"
+                    sh '''
+                    echo "===== TEST SSH CONNECTION ====="
+                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "echo SSH SUCCESS" || exit 1
 
-                    echo ===== TEST SSH CONNECTION =====
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "echo SSH SUCCESS" || exit 1
+                    echo "===== CREATE FRONTEND DIRECTORY ====="
+                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${FRONTEND_PATH}" || exit 1
 
-                    echo ===== CREATE FRONTEND DIRECTORY =====
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.FRONTEND_PATH}" || exit 1
+                    echo "===== UPLOAD FRONTEND ====="
+                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/frontend/dist/." $SSH_USER@${SERVER_HOST}:${FRONTEND_PATH} || exit 1
 
-                    echo ===== UPLOAD FRONTEND =====
-                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" -r "%WORKSPACE%\\frontend\\dist\\." %SSH_USER%@${env.SERVER_HOST}:${env.FRONTEND_PATH} || exit 1
-
-                    echo ===== RELOAD NGINX =====
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "sudo nginx -s reload || echo Nginx reload skipped"
-                    """
+                    echo "===== RELOAD NGINX ====="
+                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "sudo nginx -s reload || echo Nginx reload skipped"
+                    '''
                 }
             }
         }
@@ -80,21 +72,20 @@ pipeline {
                         usernameVariable: 'SSH_USER'
                     )
                 ]) {
-                    bat """
-                    echo ===== FIX SSH KEY PERMISSIONS =====
-                    icacls "%SSH_KEY%" /inheritance:r
-                    icacls "%SSH_KEY%" /grant:r "SYSTEM:R"
+                    sh '''
+                    echo "===== CREATE BACKEND DIRECTORY ====="
+                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${BACKEND_PATH}" || exit 1
 
-                    echo ===== CREATE BACKEND DIRECTORY =====
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} "mkdir -p ${env.BACKEND_PATH}" || exit 1
+                    echo "===== UPLOAD BACKEND ====="
+                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/backend/." $SSH_USER@${SERVER_HOST}:${BACKEND_PATH} || exit 1
 
-                    echo ===== UPLOAD BACKEND =====
-                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" -r "%WORKSPACE%\\backend\\." %SSH_USER%@${env.SERVER_HOST}:${env.BACKEND_PATH} || exit 1
-
-                    echo ===== INSTALL & START BACKEND =====
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "%SSH_KEY%" %SSH_USER%@${env.SERVER_HOST} ^
-                    "cd ${env.BACKEND_PATH} && npm install --production && (pm2 restart ${env.BACKEND_PROCESS_NAME} || pm2 start index.js --name ${env.BACKEND_PROCESS_NAME})" || exit 1
-                    """
+                    echo "===== INSTALL & START BACKEND ====="
+                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "
+                        cd ${BACKEND_PATH} && \
+                        npm install --production && \
+                        (pm2 restart ${BACKEND_PROCESS_NAME} || pm2 start index.js --name ${BACKEND_PROCESS_NAME})
+                    " || exit 1
+                    '''
                 }
             }
         }
