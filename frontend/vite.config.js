@@ -1,16 +1,7 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import vue from '@vitejs/plugin-vue'  // or react, etc.
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  base: '/myapp/',
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
-  },
+  base: '/myapp/',   // <--- this must match your URL path
+  plugins: [vue()]
 })
