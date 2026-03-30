@@ -47,12 +47,20 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${FRONTEND_PATH}"
+                    set -e
 
-                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/frontend/dist/." \
-                    $SSH_USER@${SERVER_HOST}:${FRONTEND_PATH}
+                    echo "===== CREATE FRONTEND DIR ====="
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} \
+                        "mkdir -p ${FRONTEND_PATH}"
 
-                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "sudo nginx -s reload || true"
+                    echo "===== UPLOAD FRONTEND ====="
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r \
+                        "$WORKSPACE/frontend/dist/." \
+                        $SSH_USER@${SERVER_HOST}:${FRONTEND_PATH}
+
+                    echo "===== RELOAD NGINX ====="
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} \
+                        "sudo /usr/sbin/nginx -s reload || true"
                     '''
                 }
             }
@@ -68,14 +76,21 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${BACKEND_PATH}"
+                    set -e
 
-                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/backend/." \
-                    $SSH_USER@${SERVER_HOST}:${BACKEND_PATH}
+                    echo "===== CREATE BACKEND DIR ====="
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} \
+                        "mkdir -p ${BACKEND_PATH}"
 
+                    echo "===== UPLOAD BACKEND ====="
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r \
+                        "$WORKSPACE/backend/." \
+                        $SSH_USER@${SERVER_HOST}:${BACKEND_PATH}
+
+                    echo "===== INSTALL & START BACKEND ====="
                     ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "
                         cd ${BACKEND_PATH} &&
-                        npm install --production &&
+                        npm install --omit=dev &&
                         (pm2 restart ${BACKEND_PROCESS_NAME} || pm2 start index.js --name ${BACKEND_PROCESS_NAME})
                     "
                     '''
