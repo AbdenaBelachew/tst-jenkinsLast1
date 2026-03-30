@@ -2,19 +2,17 @@ pipeline {
     agent any
 
     environment {
-        SSH_KEY_ID = 'abdenab_ssh_key'  // Jenkins credential ID
+        // Path to your private key stored in Jenkins credentials (SSH Key type)
+        SSH_KEY = credentials('abdenab_ssh_key')  
         REMOTE_USER = 'abdenab'
         REMOTE_HOST = '10.8.101.33'
-        FRONTEND_REMOTE_DIR = '/var/www/myapp'
-        BACKEND_REMOTE_DIR = '/home/abdenab/backend'
-        NODE_ENV = 'production'
+        DEPLOY_PATH = '/home/abdenab/myapp'
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
+                git branch: 'main', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
             }
         }
 
@@ -29,7 +27,7 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 dir('frontend') {
-                    sh 'npm run build'
+                    sh 'npx vite build'
                 }
             }
         }
@@ -44,13 +42,13 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: env.SSH_KEY_ID,
-                                                  keyFileVariable: 'SSH_KEY',
+                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key',
+                                                  keyFileVariable: 'SSH_KEY_FILE',
                                                   usernameVariable: 'SSH_USER')]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'sudo mkdir -p $FRONTEND_REMOTE_DIR && sudo chown -R $SSH_USER:$SSH_USER $FRONTEND_REMOTE_DIR'
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY -r frontend/dist/. $SSH_USER@$REMOTE_HOST:$FRONTEND_REMOTE_DIR/
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'sudo nginx -s reload'
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $REMOTE_USER@$REMOTE_HOST \\
+                    'mkdir -p $DEPLOY_PATH && rm -rf $DEPLOY_PATH/*'
+                    scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r frontend/dist/* $REMOTE_USER@$REMOTE_HOST:$DEPLOY_PATH/
                     """
                 }
             }
@@ -58,22 +56,15 @@ pipeline {
 
         stage('Deploy Backend') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: env.SSH_KEY_ID,
-                                                  keyFileVariable: 'SSH_KEY',
+                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key',
+                                                  keyFileVariable: 'SSH_KEY_FILE',
                                                   usernameVariable: 'SSH_USER')]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'mkdir -p $BACKEND_REMOTE_DIR'
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY -r backend/. $SSH_USER@$REMOTE_HOST:$BACKEND_REMOTE_DIR/
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST '
-                            cd $BACKEND_REMOTE_DIR &&
-                            npm install --omit=dev &&
-                            pm2 restart my-backend || pm2 start index.js --name my-backend
-                        '
+                    scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r backend/* $REMOTE_USER@$REMOTE_HOST:$DEPLOY_PATH/
                     """
                 }
             }
         }
-
     }
 
     post {
@@ -81,7 +72,7 @@ pipeline {
             echo "✅ Deployment Successful!"
         }
         failure {
-            echo "❌ Deployment Failed!"
+            echo "❌ Deployment Failed! Check logs above."
         }
     }
 }
