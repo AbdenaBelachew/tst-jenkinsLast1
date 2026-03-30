@@ -9,11 +9,22 @@ pipeline {
             }
         }
         
-        stage('Build Backend') {
+        stage('Deploy Backend') {
             steps {
-                dir('backend') {
-                    sh 'npm install'
-                    sh 'npm run build'  // or adjust if your backend does not need build
+                sshagent(['linux-ssh-creds']) {
+                    sh '''
+                      # Remove old backend
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "sudo rm -rf /var/backend && sudo mkdir -p /var/backend"
+                      
+                      # Copy backend files
+                      scp -o StrictHostKeyChecking=no -r backend/* abdenab@10.8.101.33:/tmp/backend/
+                      
+                      # Move to /var/backend with proper permissions
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "
+                        sudo mv /tmp/backend/* /var/backend/ &&
+                        sudo chown -R abdenab:abdenab /var/backend
+                      "
+                    '''
                 }
             }
         }
@@ -22,7 +33,7 @@ pipeline {
             steps {
                 dir('frontend') {
                     sh 'npm install'
-                    sh 'npm run build'  // creates frontend/build folder
+                    sh 'npm run build'
                 }
             }
         }
@@ -31,7 +42,7 @@ pipeline {
             steps {
                 sshagent(['linux-ssh-creds']) {
                     sh '''
-                      # Remove old frontend files
+                      # Remove old frontend from Nginx
                       ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "sudo rm -rf /var/www/html/*"
                       
                       # Copy new frontend build
@@ -50,25 +61,11 @@ pipeline {
             }
         }
         
-        stage('Deploy Backend') {
-            steps {
-                sshagent(['linux-ssh-creds']) {
-                    sh '''
-                      # Create backend folder
-                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "mkdir -p ~/deploy/backend"
-                      
-                      # Copy backend files
-                      scp -o StrictHostKeyChecking=no -r backend/* abdenab@10.8.101.33:~/deploy/backend/
-                    '''
-                }
-            }
-        }
-        
     }
     
     post {
         success {
-            echo 'Pipeline completed successfully. Frontend is served by Nginx.'
+            echo 'Pipeline completed successfully. Frontend is served by Nginx and backend is in /var/backend.'
         }
         failure {
             echo 'Pipeline failed.'
