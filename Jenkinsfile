@@ -2,16 +2,17 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_PATH = "/home/abdenab/myapp"
-        TARGET_SERVER = "10.8.101.33"
+        // Environment variables for deployment
+        DEPLOY_USER = 'abdenab'
+        DEPLOY_HOST = '10.8.101.33'
+        DEPLOY_DIR  = '/home/abdenab/myapp'
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                // Make sure your Git credentials are set if the repo is private
-                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
+                git branch: 'main',
+                    url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
             }
         }
 
@@ -41,21 +42,23 @@ pipeline {
 
         stage('Deploy Frontend and Backend') {
             steps {
-                // Use Jenkins SSH credentials
-                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                // Inject SSH credentials from Jenkins
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ssh_key',      // Replace with your Jenkins credential ID
+                    keyFileVariable: 'SSH_KEY_FILE',
+                    usernameVariable: 'SSH_USER'
+                )]) {
                     sh """
-                        echo "Deploying to $TARGET_SERVER..."
-                        
-                        # Create deploy folder and clean old files
-                        ssh -o StrictHostKeyChecking=no -i \$SSH_KEY_FILE \$SSH_USER@\$TARGET_SERVER 'mkdir -p $DEPLOY_PATH && rm -rf $DEPLOY_PATH/*'
-
-                        # Copy frontend build
-                        scp -o StrictHostKeyChecking=no -i \$SSH_KEY_FILE -r frontend/dist/* \$SSH_USER@\$TARGET_SERVER:$DEPLOY_PATH/
-
-                        # Copy backend files
-                        scp -o StrictHostKeyChecking=no -i \$SSH_KEY_FILE -r backend/* \$SSH_USER@\$TARGET_SERVER:$DEPLOY_PATH/
-
-                        echo "Deployment finished!"
+                    echo "Deploying to ${DEPLOY_HOST}..."
+                    
+                    # Ensure directory exists and clean it
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" "$SSH_USER@$DEPLOY_HOST" "mkdir -p '${DEPLOY_DIR}' && rm -rf '${DEPLOY_DIR}/*'"
+                    
+                    # Upload frontend and backend
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" -r frontend/dist/* "$SSH_USER@$DEPLOY_HOST:$DEPLOY_DIR/frontend/"
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY_FILE" -r backend/* "$SSH_USER@$DEPLOY_HOST:$DEPLOY_DIR/backend/"
+                    
+                    echo "Deployment completed successfully!"
                     """
                 }
             }
@@ -64,10 +67,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployment successful!"
+            echo '✅ Pipeline completed successfully!'
         }
         failure {
-            echo "❌ Deployment failed! Check logs above."
+            echo '❌ Deployment failed! Check logs above.'
         }
     }
 }
