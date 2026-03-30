@@ -2,20 +2,16 @@ pipeline {
     agent any
 
     environment {
-        SSH_KEY = credentials('linux-ssh-creds') // Add your Jenkins SSH credential ID
         DEPLOY_USER = "abdenab"
         DEPLOY_HOST = "10.8.101.33"
-        FRONTEND_PATH = "/home/abdenab/myapp"
-        BACKEND_PATH = "/home/abdenab/backend"
+        FRONTEND_PATH = "/var/www/myapp"        // Standard Nginx path for static files
+        BACKEND_PATH = "/home/abdenab/backend"  // Backend folder
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
-                checkout([$class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git']]
-                ])
+                git branch: 'main', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
             }
         }
 
@@ -46,11 +42,16 @@ pipeline {
         stage('Deploy Frontend') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'linux-ssh-creds', keyFileVariable: 'SSH_KEY')]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST 'mkdir -p $FRONTEND_PATH'
+                    sh '''
+                        # Create folder if missing
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "sudo mkdir -p $FRONTEND_PATH && sudo chown -R $DEPLOY_USER:$DEPLOY_USER $FRONTEND_PATH"
+                        
+                        # Copy files
                         scp -o StrictHostKeyChecking=no -i $SSH_KEY -r frontend/dist/* $DEPLOY_USER@$DEPLOY_HOST:$FRONTEND_PATH/
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST 'sudo nginx -s reload || true'
-                    """
+                        
+                        # Reload Nginx
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "sudo nginx -s reload"
+                    '''
                 }
             }
         }
@@ -58,15 +59,19 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'linux-ssh-creds', keyFileVariable: 'SSH_KEY')]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST 'mkdir -p $BACKEND_PATH'
+                    sh '''
+                        # Create backend folder
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $BACKEND_PATH"
+
+                        # Copy backend files
                         scp -o StrictHostKeyChecking=no -i $SSH_KEY -r backend/* $DEPLOY_USER@$DEPLOY_HOST:$BACKEND_PATH/
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST '
-                            cd $BACKEND_PATH &&
-                            npm install --production &&
-                            (pm2 restart my-backend || pm2 start index.js --name my-backend)
-                        '
-                    """
+
+                        # Install production dependencies
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "cd $BACKEND_PATH && npm install --production"
+
+                        # Start or restart backend via PM2
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $DEPLOY_USER@$DEPLOY_HOST "pm2 describe my-backend || pm2 start index.js --name my-backend; pm2 restart my-backend"
+                    '''
                 }
             }
         }
@@ -74,10 +79,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Deployment Successful!'
+            echo "✅ Deployment Successful!"
         }
         failure {
-            echo '❌ Deployment Failed! Check logs above.'
+            echo "❌ Deployment Failed! Check logs above."
         }
     }
 }
