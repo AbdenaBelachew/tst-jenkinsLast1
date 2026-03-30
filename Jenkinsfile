@@ -2,15 +2,17 @@ pipeline {
     agent any
 
     environment {
-        SSH_KEY = credentials('abdenab_ssh_key') // Jenkins credential ID for your private key
-        REMOTE_USER = "abdenab"
-        REMOTE_HOST = "10.8.101.33"
-        FRONTEND_DIR = "/var/www/myapp"
-        BACKEND_DIR = "/home/abdenab/backend"
+        SSH_KEY_ID = 'abdenab_ssh_key'  // Jenkins credential ID
+        REMOTE_USER = 'abdenab'
+        REMOTE_HOST = '10.8.101.33'
+        FRONTEND_REMOTE_DIR = '/var/www/myapp'
+        BACKEND_REMOTE_DIR = '/home/abdenab/backend'
+        NODE_ENV = 'production'
     }
 
     stages {
-        stage('Checkout SCM') {
+
+        stage('Checkout Code') {
             steps {
                 git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
             }
@@ -42,11 +44,13 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: env.SSH_KEY_ID,
+                                                  keyFileVariable: 'SSH_KEY',
+                                                  usernameVariable: 'SSH_USER')]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $REMOTE_USER@$REMOTE_HOST 'sudo mkdir -p $FRONTEND_DIR && sudo chown -R $REMOTE_USER:$REMOTE_USER $FRONTEND_DIR'
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r frontend/dist/. $REMOTE_USER@$REMOTE_HOST:$FRONTEND_DIR
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $REMOTE_USER@$REMOTE_HOST 'sudo systemctl reload nginx'
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'sudo mkdir -p $FRONTEND_REMOTE_DIR && sudo chown -R $SSH_USER:$SSH_USER $FRONTEND_REMOTE_DIR'
+                        scp -o StrictHostKeyChecking=no -i $SSH_KEY -r frontend/dist/. $SSH_USER@$REMOTE_HOST:$FRONTEND_REMOTE_DIR/
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'sudo nginx -s reload'
                     """
                 }
             }
@@ -54,19 +58,22 @@ pipeline {
 
         stage('Deploy Backend') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'abdenab_ssh_key', keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: env.SSH_KEY_ID,
+                                                  keyFileVariable: 'SSH_KEY',
+                                                  usernameVariable: 'SSH_USER')]) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $REMOTE_USER@$REMOTE_HOST "mkdir -p $BACKEND_DIR"
-                        scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE -r backend/. $REMOTE_USER@$REMOTE_HOST:$BACKEND_DIR
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE $REMOTE_USER@$REMOTE_HOST "
-                            cd $BACKEND_DIR &&
-                            npm install --production &&
-                            (pm2 restart my-backend || pm2 start index.js --name my-backend)
-                        "
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST 'mkdir -p $BACKEND_REMOTE_DIR'
+                        scp -o StrictHostKeyChecking=no -i $SSH_KEY -r backend/. $SSH_USER@$REMOTE_HOST:$BACKEND_REMOTE_DIR/
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$REMOTE_HOST '
+                            cd $BACKEND_REMOTE_DIR &&
+                            npm install --omit=dev &&
+                            pm2 restart my-backend || pm2 start index.js --name my-backend
+                        '
                     """
                 }
             }
         }
+
     }
 
     post {
@@ -74,7 +81,7 @@ pipeline {
             echo "✅ Deployment Successful!"
         }
         failure {
-            echo "❌ Deployment Failed! Check logs above."
+            echo "❌ Deployment Failed!"
         }
     }
 }
