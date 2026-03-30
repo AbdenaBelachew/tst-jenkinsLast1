@@ -9,20 +9,18 @@ pipeline {
             }
         }
         
-        stage('Deploy Backend') {
+        stage('Deploy Backend Incremental') {
             steps {
                 sshagent(['linux-ssh-creds']) {
                     sh '''
-                      # Remove old backend
-                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "sudo rm -rf /var/backend && sudo mkdir -p /var/backend"
-                      
-                      # Copy backend files
-                      scp -o StrictHostKeyChecking=no -r backend/* abdenab@10.8.101.33:/tmp/backend/
-                      
-                      # Move to /var/backend with proper permissions
                       ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "
-                        sudo mv /tmp/backend/* /var/backend/ &&
-                        sudo chown -R abdenab:abdenab /var/backend
+                        mkdir -p /var/backend
+                      "
+                      
+                      rsync -avz --exclude 'node_modules' backend/ abdenab@10.8.101.33:/var/backend/
+                      
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "
+                        chown -R abdenab:abdenab /var/backend
                       "
                     '''
                 }
@@ -38,23 +36,21 @@ pipeline {
             }
         }
         
-        stage('Deploy Frontend to Nginx') {
+        stage('Deploy Frontend Incremental to Nginx') {
             steps {
                 sshagent(['linux-ssh-creds']) {
                     sh '''
-                      # Remove old frontend from Nginx
-                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "sudo rm -rf /var/www/html/*"
-                      
-                      # Copy new frontend build
-                      scp -o StrictHostKeyChecking=no -r frontend/build/* abdenab@10.8.101.33:/tmp/frontend_build/
-                      
-                      # Move to Nginx folder with correct permissions
                       ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "
-                        sudo mv /tmp/frontend_build/* /var/www/html/ &&
-                        sudo chown -R www-data:www-data /var/www/html &&
-                        sudo find /var/www/html -type d -exec chmod 755 {} \\; &&
-                        sudo find /var/www/html -type f -exec chmod 644 {} \\;
-                        sudo nginx -t && sudo systemctl restart nginx
+                        mkdir -p /var/www/html
+                      "
+                      
+                      rsync -avz frontend/build/ abdenab@10.8.101.33:/var/www/html/
+                      
+                      ssh -o StrictHostKeyChecking=no abdenab@10.8.101.33 "
+                        chown -R www-data:www-data /var/www/html &&
+                        find /var/www/html -type d -exec chmod 755 {} \\; &&
+                        find /var/www/html -type f -exec chmod 644 {} \\; &&
+                        nginx -t && systemctl restart nginx
                       "
                     '''
                 }
@@ -65,7 +61,7 @@ pipeline {
     
     post {
         success {
-            echo 'Pipeline completed successfully. Frontend is served by Nginx and backend is in /var/backend.'
+            echo 'Pipeline completed successfully. Backend and frontend updated incrementally.'
         }
         failure {
             echo 'Pipeline failed.'
