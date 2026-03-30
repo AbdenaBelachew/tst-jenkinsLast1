@@ -6,9 +6,9 @@ pipeline {
         SERVER_HOST          = '10.8.101.33'
         SSH_CREDS_ID         = 'linux-ssh-creds'
 
-        FRONTEND_TARGET      = '/var/www/html'
+        // Updated to your "Option A" recommendation
+        FRONTEND_TARGET      = '/var/www/myapp'
         
-        // Normalize workspace path for Windows agents
         WS_PATH              = "${env.WORKSPACE.replace('\\', '/')}"
     }
 
@@ -31,17 +31,17 @@ pipeline {
                 sshagent([env.SSH_CREDS_ID]) {
                     sh """
                     set -e
-                    echo "===== PREPARING FRONTEND DIRECTORY ====="
+                    echo "===== PREPARING PRODUCTION DIRECTORY ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
                         sudo mkdir -p ${FRONTEND_TARGET} && 
                         sudo chown -R ${SERVER_USER}:${SERVER_USER} ${FRONTEND_TARGET}
                     "
 
-                    echo "===== RSYNC FRONTEND BUILD ====="
-                    # Create-React-App builds to 'build/'
+                    echo "===== RSYNC BUILD TO PRODUCTION ====="
+                    # build/ syncs contents only, --delete ensures clean deployment
                     rsync -avz --delete build/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
 
-                    echo "===== RESTARTING NGINX ====="
+                    echo "===== APPLYING NGINX PERMISSIONS & RESTARTING ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
                         sudo chown -R www-data:www-data ${FRONTEND_TARGET} &&
                         sudo find ${FRONTEND_TARGET} -type d -exec chmod 755 {} \\; &&
@@ -56,10 +56,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline completed successfully. React app deployed to root.'
+            echo '✅ Production deployment successful to /var/www/myapp'
         }
         failure {
-            echo '❌ Pipeline failed! Check logs for details.'
+            echo '❌ Deployment failed! Please check Nginx logs or SSH connectivity.'
         }
     }
 }
