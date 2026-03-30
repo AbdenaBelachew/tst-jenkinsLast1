@@ -47,17 +47,12 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                    echo "===== TEST SSH CONNECTION ====="
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "echo SSH SUCCESS" || exit 1
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${FRONTEND_PATH}"
 
-                    echo "===== CREATE FRONTEND DIRECTORY ====="
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${FRONTEND_PATH}" || exit 1
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/frontend/dist/." \
+                    $SSH_USER@${SERVER_HOST}:${FRONTEND_PATH}
 
-                    echo "===== UPLOAD FRONTEND ====="
-                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/frontend/dist/." $SSH_USER@${SERVER_HOST}:${FRONTEND_PATH} || exit 1
-
-                    echo "===== RELOAD NGINX ====="
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "sudo nginx -s reload || echo Nginx reload skipped"
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "sudo nginx -s reload || true"
                     '''
                 }
             }
@@ -73,18 +68,16 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                    echo "===== CREATE BACKEND DIRECTORY ====="
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${BACKEND_PATH}" || exit 1
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "mkdir -p ${BACKEND_PATH}"
 
-                    echo "===== UPLOAD BACKEND ====="
-                    scp -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/backend/." $SSH_USER@${SERVER_HOST}:${BACKEND_PATH} || exit 1
+                    scp -o StrictHostKeyChecking=no -i "$SSH_KEY" -r "$WORKSPACE/backend/." \
+                    $SSH_USER@${SERVER_HOST}:${BACKEND_PATH}
 
-                    echo "===== INSTALL & START BACKEND ====="
-                    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "
-                        cd ${BACKEND_PATH} && \
-                        npm install --production && \
+                    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $SSH_USER@${SERVER_HOST} "
+                        cd ${BACKEND_PATH} &&
+                        npm install --production &&
                         (pm2 restart ${BACKEND_PROCESS_NAME} || pm2 start index.js --name ${BACKEND_PROCESS_NAME})
-                    " || exit 1
+                    "
                     '''
                 }
             }
@@ -96,7 +89,7 @@ pipeline {
             echo '✅ Deployment Successful!'
         }
         failure {
-            echo '❌ Deployment Failed! Check logs above.'
+            echo '❌ Deployment Failed!'
         }
     }
 }
