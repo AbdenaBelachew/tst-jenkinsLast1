@@ -7,8 +7,6 @@ pipeline {
         SSH_CREDS_ID         = 'linux-ssh-creds'
 
         FRONTEND_TARGET      = '/var/www/html'
-        BACKEND_TARGET       = '/var/backend'
-        BACKEND_PROCESS_NAME = 'my-backend'
         
         // Normalize workspace path for Windows agents
         WS_PATH              = "${env.WORKSPACE.replace('\\', '/')}"
@@ -17,42 +15,14 @@ pipeline {
     stages {
         stage('Clone Source') {
             steps {
-                // Jenkins usually does this automatically if configured with repository URL
-                // But we keep it if the user specifically needs it
                 git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
             }
         }
 
         stage('Build Frontend') {
             steps {
-                dir('frontend') {
-                    sh 'npm install'
-                    sh 'npm run build'
-                }
-            }
-        }
-
-        stage('Deploy Backend') {
-            steps {
-                sshagent([env.SSH_CREDS_ID]) {
-                    sh """
-                    set -e
-                    echo "===== PREPARING BACKEND DIRECTORY ====="
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
-                        sudo mkdir -p ${BACKEND_TARGET} && 
-                        sudo chown -R ${SERVER_USER}:${SERVER_USER} ${BACKEND_TARGET}
-                    "
-
-                    echo "===== RSYNC BACKEND FILES ====="
-                    # Note: We exclude node_modules to let the remote server handle them
-                    rsync -avz --delete --exclude 'node_modules' backend/ ${SERVER_USER}@${SERVER_HOST}:${BACKEND_TARGET}/
-
-                    echo "===== RESTARTING BACKEND SERVICE ====="
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
-                        bash -l -c 'cd ${BACKEND_TARGET} && npm install --omit=dev && (pm2 restart ${BACKEND_PROCESS_NAME} || pm2 start index.js --name ${BACKEND_PROCESS_NAME})'
-                    "
-                    """
-                }
+                sh 'npm install'
+                sh 'npm run build'
             }
         }
 
@@ -68,8 +38,8 @@ pipeline {
                     "
 
                     echo "===== RSYNC FRONTEND BUILD ====="
-                    # Vite builds to 'dist/', corrected from 'build/'
-                    rsync -avz --delete frontend/dist/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
+                    # Create-React-App builds to 'build/'
+                    rsync -avz --delete build/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
 
                     echo "===== RESTARTING NGINX ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
@@ -86,7 +56,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline completed successfully. Backend and frontend updated.'
+            echo '✅ Pipeline completed successfully. React app deployed to root.'
         }
         failure {
             echo '❌ Pipeline failed! Check logs for details.'

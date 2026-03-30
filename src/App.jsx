@@ -1,16 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './index.css'
 
 function App() {
   const [count, setCount] = useState(0)
-  const [backendStatus, setBackendStatus] = useState('Checking...')
-
-  useEffect(() => {
-    fetch('http://localhost:3001/api/status')
-      .then(res => res.json())
-      .then(data => setBackendStatus(data.status + ': ' + data.message))
-      .catch(err => setBackendStatus('Offline (Make sure backend is running)'))
-  }, [])
 
   return (
     <div className="animate-fade-in" style={{ position: 'relative' }}>
@@ -20,7 +12,7 @@ function App() {
       
       <div className="glass-container">
         <div style={{ marginBottom: '1rem', display: 'inline-block', padding: '0.5rem 1rem', borderRadius: '100px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#818cf8', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Experimental Build v1.0
+          Production Build v1.0
         </div>
         
         <h1>Quantum Logic</h1>
@@ -30,10 +22,6 @@ function App() {
           {count}
         </div>
 
-        <div style={{ margin: '1rem 0', padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', fontSize: '0.9rem', color: backendStatus.includes('Online') ? '#4ade80' : '#f87171' }}>
-          Backend: {backendStatus}
-        </div>
-        
         <button 
           className="btn-primary"
           onClick={() => setCount((count) => count + 1)}
@@ -42,7 +30,7 @@ function App() {
         </button>
         
         <div style={{ marginTop: '3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>
-          Crafted with precision using <span style={{ color: 'rgba(255,255,255,0.6)' }}>Vite + React</span>
+          Crafted with precision using <span style={{ color: 'rgba(255,255,255,0.6)' }}>React</span>
         </div>
       </div>
     </div>
