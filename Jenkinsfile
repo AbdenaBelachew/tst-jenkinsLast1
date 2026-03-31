@@ -15,7 +15,7 @@ pipeline {
                 echo "💻 Building on: ${env.NODE_NAME}"
 
                 // Use ONLY one branch (fixes your confusion)
-                git branch: 'main', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
+                git branch: 'newbr', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
             }
         }
 
