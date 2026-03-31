@@ -21,17 +21,14 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                echo "🏗️ Starting Build..."
-
-                script {
-                    // Check if package.json exists before running npm
-                    if (!fileExists('package.json')) {
-                        error "❌ package.json not found! Fix repo or update path."
-                    }
-                }
-
+                echo "🏗️ Starting Fresh Build..."
                 sh 'npm install'
-                sh 'CI=false npm run build'
+                // CI=false prevents failing on minor lint/style warnings
+                sh 'env CI=false npm run build'
+                
+                // DIAGNOSTIC STEP: Check file structure to catch 'assets/' vs 'static/' mismatches
+                echo "📊 Listing Build Artifacts:"
+                sh 'ls -R build'
             }
         }
 
@@ -39,29 +36,30 @@ pipeline {
             steps {
                 script {
                     if (!fileExists('build/index.html')) {
-                        error "❌ Build failed: build/index.html not found."
+                        error "❌ Deployment aborted: 'build/index.html' missing!"
                     }
                 }
-
+                
                 sshagent([env.SSH_CREDS_ID]) {
                     sh """
                     set -e
-
-                    echo "===== PREPARING PRODUCTION DIRECTORY ====="
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
-                        sudo mkdir -p ${FRONTEND_TARGET} &&
+                    echo "===== PREPARING SERVER DIRECTORY ====="
+                    # Note: We wipe the server folder to prevent old Vite 'assets/' from lingering
+                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
+                        sudo mkdir -p ${FRONTEND_TARGET} && 
+                        sudo rm -rf ${FRONTEND_TARGET}/* &&
                         sudo chown -R ${SERVER_USER}:${SERVER_USER} ${FRONTEND_TARGET}
                     "
 
                     echo "===== RSYNC BUILD TO PRODUCTION ====="
                     rsync -avz --delete build/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
 
-                    echo "===== RESTARTING NGINX ====="
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
+                    echo "===== APPLYING NGINX PERMISSIONS & RESTARTING ====="
+                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
                         sudo chown -R www-data:www-data ${FRONTEND_TARGET} &&
-                        sudo chmod -R 755 ${FRONTEND_TARGET} &&
-                        sudo nginx -t &&
-                        sudo systemctl restart nginx
+                        sudo find ${FRONTEND_TARGET} -type d -exec chmod 755 {} \\; &&
+                        sudo find ${FRONTEND_TARGET} -type f -exec chmod 644 {} \\; &&
+                        sudo nginx -t && sudo systemctl restart nginx
                     "
                     """
                 }
@@ -71,13 +69,13 @@ pipeline {
 
     post {
         success {
-            echo '✅ Production deployment successful to /var/www/myapp'
+            echo '✅ Clean production deployment successful to /var/www/myapp'
         }
         failure {
-            echo '❌ Deployment failed! Check logs.'
+            echo '❌ Deployment failed! Please check if "npm run build" produced a "build/" or "dist/" folder.'
         }
         always {
-            // FIX: cleanWs() removed (plugin missing)
+            // Clean workspace to keep agent tidy
             deleteDir()
         }
     }
