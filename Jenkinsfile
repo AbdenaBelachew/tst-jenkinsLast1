@@ -12,11 +12,11 @@ pipeline {
     }
 
     stages {
-        stage('Clean & Clone') {
+        stage('Prepare Workspace') {
             steps {
-                echo "🚜 Cleaning build workspace..."
-                deleteDir()
-                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'fullbr'
+                echo "🚜 Workspace ready. Jenkins automatically checked out the latest code."
+                // Do NOT use deleteDir() here, or you will delete the code Jenkins just downloaded!
+                // Do NOT use git ..., or Jenkins will crash searching for duplicate commits.
             }
         }
 
