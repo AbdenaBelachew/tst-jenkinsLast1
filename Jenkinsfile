@@ -16,7 +16,7 @@ pipeline {
             steps {
                 echo "💻 Building on: ${env.NODE_NAME}"
                 // Ensure fresh project state
-                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'main'
+                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'newbr'
             }
         }
 
