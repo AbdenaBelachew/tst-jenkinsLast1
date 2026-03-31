@@ -7,9 +7,10 @@ function App() {
 
   useEffect(() => {
     // Attempt to connect to the backend API
+    // In production (Jenkins), Nginx will handle the traffic on port 80, avoiding firewall blocks.
     const API_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:3001/api/status' 
-      : `http://${window.location.hostname}:3001/api/status`;
+      : `http://${window.location.hostname}/api/status`;
 
     fetch(API_URL)
       .then(res => res.json())
