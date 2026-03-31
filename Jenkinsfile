@@ -2,57 +2,82 @@ pipeline {
     agent any
 
     environment {
-        SERVER_USER     = 'abdenab'
-        SERVER_HOST     = '10.8.101.33'
-        SSH_CREDS_ID    = 'linux-ssh-creds'
-        FRONTEND_TARGET = '/var/www/myapp'
+        SERVER_USER          = 'abdenab'
+        SERVER_HOST          = '10.8.101.33'
+        SSH_CREDS_ID         = 'linux-ssh-creds'
+        
+        FRONTEND_TARGET      = '/var/www/myapp'
+        BACKEND_TARGET       = '/var/backend'
+        BACKEND_PROCESS_NAME = 'my-node-backend'
     }
 
     stages {
-
-        stage('Prepare') {
+        stage('Clean & Clone') {
             steps {
-                echo "💻 Building on: ${env.NODE_NAME}"
-
-                // Use ONLY one branch (fixes your confusion)
-                git branch: 'newbr', url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git'
+                echo "🚜 Cleaning build workspace..."
+                deleteDir()
+                git url: 'https://github.com/AbdenaBelachew/tst-jenkinsLast1.git', branch: 'fullbr'
             }
         }
 
         stage('Build Frontend') {
             steps {
-                echo "🏗️ Starting Fresh Build..."
-                sh 'npm install'
-                // CI=false prevents failing on minor lint/style warnings
-                sh 'env CI=false npm run build'
-                
-                // DIAGNOSTIC STEP: Check file structure to catch 'assets/' vs 'static/' mismatches
-                echo "📊 Listing Build Artifacts:"
-                sh 'ls -R build'
+                echo "🏗️ Building React Frontend..."
+                dir('frontend') {
+                    sh 'npm install'
+                    sh 'env CI=false npm run build'
+                }
             }
         }
 
-        stage('Deploy Frontend') {
+        // 🚀 Backend intentionally has no build stage because it's native Node.js
+        stage('Deploy Backend (Node.js)') {
             steps {
+                echo "📤 Deploying Backend directly to server..."
+                sshagent([env.SSH_CREDS_ID]) {
+                    sh """
+                    set -e
+                    echo "===== PREPARING BACKEND DIRECTORY ====="
+                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
+                        sudo mkdir -p ${BACKEND_TARGET} && 
+                        sudo chown -R ${SERVER_USER}:${SERVER_USER} ${BACKEND_TARGET}
+                    "
+
+                    echo "===== COPYING BACKEND FILES ====="
+                    # We only copy the source code, ignoring local node_modules
+                    rsync -avz --delete --exclude 'node_modules' backend/ ${SERVER_USER}@${SERVER_HOST}:${BACKEND_TARGET}/
+
+                    echo "===== INSTALLING DEPENDENCIES & RESTARTING NODE ====="
+                    # Runs npm install directly on the server, then restarts via PM2
+                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
+                        bash -l -c 'cd ${BACKEND_TARGET} && npm install --omit=dev && (pm2 restart ${BACKEND_PROCESS_NAME} || pm2 start index.js --name ${BACKEND_PROCESS_NAME})'
+                    "
+                    """
+                }
+            }
+        }
+
+        stage('Deploy Frontend (React)') {
+            steps {
+                echo "📤 Deploying Frontend build to Nginx..."
                 script {
-                    if (!fileExists('build/index.html')) {
-                        error "❌ Deployment aborted: 'build/index.html' missing!"
+                    if (!fileExists('frontend/build/index.html')) {
+                        error "❌ Deployment aborted: 'frontend/build/index.html' missing!"
                     }
                 }
                 
                 sshagent([env.SSH_CREDS_ID]) {
                     sh """
                     set -e
-                    echo "===== PREPARING SERVER DIRECTORY ====="
-                    # Note: We wipe the server folder to prevent old Vite 'assets/' from lingering
+                    echo "===== PREPARING FRONTEND DIRECTORY ====="
                     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
                         sudo mkdir -p ${FRONTEND_TARGET} && 
                         sudo rm -rf ${FRONTEND_TARGET}/* &&
                         sudo chown -R ${SERVER_USER}:${SERVER_USER} ${FRONTEND_TARGET}
                     "
 
-                    echo "===== RSYNC BUILD TO PRODUCTION ====="
-                    rsync -avz --delete build/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
+                    echo "===== RSYNC FRONTEND BUILD ====="
+                    rsync -avz --delete frontend/build/ ${SERVER_USER}@${SERVER_HOST}:${FRONTEND_TARGET}/
 
                     echo "===== APPLYING NGINX PERMISSIONS & RESTARTING ====="
                     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SERVER_USER}@${SERVER_HOST} "
@@ -69,14 +94,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Clean production deployment successful to /var/www/myapp'
+            echo '✅ Full-stack deployment successful!'
         }
         failure {
-            echo '❌ Deployment failed! Please check if "npm run build" produced a "build/" or "dist/" folder.'
-        }
-        always {
-            // Clean workspace to keep agent tidy
-            deleteDir()
+            echo '❌ Deployment failed! Please check Jenkins console output.'
         }
     }
 }

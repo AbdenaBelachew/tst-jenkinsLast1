@@ -1,8 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './index.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  const [backendStatus, setBackendStatus] = useState('Checking...')
+
+  useEffect(() => {
+    // Attempt to connect to the backend API
+    const API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3001/api/status' 
+      : `http://${window.location.hostname}:3001/api/status`;
+
+    fetch(API_URL)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'Online') {
+          setBackendStatus(`Online: ${data.message}`);
+        } else {
+          setBackendStatus(`Database Issue: ${data.message}`);
+        }
+      })
+      .catch(err => setBackendStatus('Backend Offline (Check server)'));
+  }, [])
 
   return (
     <div className="animate-fade-in" style={{ position: 'relative' }}>
@@ -16,10 +35,14 @@ function App() {
         </div>
         
         <h1>Quantum Logic</h1>
-        <p>A simple yet powerful demonstration of premium state management and fluid responsiveness.</p>
+        <p>A simple yet powerful demonstration of premium state management and fluid responsiveness with PostgreSQL.</p>
         
         <div className="counter-display">
           {count}
+        </div>
+
+        <div style={{ margin: '1rem 0', padding: '0.8rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.1)', color: backendStatus.includes('Online') ? '#4ade80' : '#f87171' }}>
+          <span style={{ opacity: 0.6 }}>Database Status:</span> {backendStatus}
         </div>
 
         <button 
@@ -30,7 +53,7 @@ function App() {
         </button>
         
         <div style={{ marginTop: '3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>
-          Crafted with precision using <span style={{ color: 'rgba(255,255,255,0.6)' }}>React</span>
+          Crafted with precision using <span style={{ color: 'rgba(255,255,255,0.6)' }}>React + Node/PG</span>
         </div>
       </div>
     </div>
