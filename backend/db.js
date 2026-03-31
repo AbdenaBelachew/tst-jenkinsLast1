@@ -6,7 +6,7 @@ const db = new Pool({
   // host: process.env.DB_HOST || "10.8.101.3",
   host: process.env.DB_HOST || "10.8.100.80",
   // host: process.env.DB_HOST || "localhost",
-  database: process.env.DB_DATABASE || "coop_erp_latest",
+  database: process.env.DB_DATABASE || "testdb",
   password: process.env.DB_PASSWORD || "123456",
   port: process.env.DB_PORT || 5432,
   // Connection pool settings for better reliability
@@ -25,13 +25,13 @@ db.query("SELECT NOW()", (err, res) => {
   if (err) {
     console.error("❌ Database connection failed:", err.message);
     console.error("   Host:", process.env.DB_HOST || "localhost");
-    console.error("   Database:", process.env.DB_DATABASE || "coop_erp_latest");
+    console.error("   Database:", process.env.DB_DATABASE || "testdb");
     console.error("   User:", process.env.DB_USER || "postgres");
     console.error("   Port:", process.env.DB_PORT || 5432);
   } else {
     console.log("✅ Database connected successfully");
-    console.log("   Host:", process.env.DB_HOST || "localhost");
-    console.log("   Database:", process.env.DB_DATABASE || "coop_erp_latest");
+    console.log("   Host:", process.env.DB_HOST || "10.8.100.80");
+    console.log("   Database:", process.env.DB_DATABASE || "testdb");
   }
 });
 
