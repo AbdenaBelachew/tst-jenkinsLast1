@@ -2,13 +2,11 @@ const { Pool } = require("pg");
 require("dotenv").config();
 
 const db = new Pool({
-  user: process.env.DB_USER || "postgres",
-  // host: process.env.DB_HOST || "10.8.101.3",
-  host: process.env.DB_HOST || "10.8.100.80",
-  // host: process.env.DB_HOST || "localhost",
-  database: process.env.DB_DATABASE || "testdb",
-  password: process.env.DB_PASSWORD || "123456",
-  port: process.env.DB_PORT || 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_DATABASE,
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT || "5432"),
   // Connection pool settings for better reliability
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
@@ -24,14 +22,14 @@ db.on('error', (err, client) => {
 db.query("SELECT NOW()", (err, res) => {
   if (err) {
     console.error("❌ Database connection failed:", err.message);
-    console.error("   Host:", process.env.DB_HOST || "localhost");
-    console.error("   Database:", process.env.DB_DATABASE || "testdb");
-    console.error("   User:", process.env.DB_USER || "postgres");
-    console.error("   Port:", process.env.DB_PORT || 5432);
+    console.error("   Host:", process.env.DB_HOST);
+    console.error("   Database:", process.env.DB_DATABASE);
+    console.error("   User:", process.env.DB_USER);
+    console.error("   Port:", process.env.DB_PORT);
   } else {
     console.log("✅ Database connected successfully");
-    console.log("   Host:", process.env.DB_HOST || "10.8.100.80");
-    console.log("   Database:", process.env.DB_DATABASE || "testdb");
+    console.log("   Host:", process.env.DB_HOST);
+    console.log("   Database:", process.env.DB_DATABASE);
   }
 });
 

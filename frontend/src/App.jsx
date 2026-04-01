@@ -8,9 +8,7 @@ function App() {
   const [loading, setLoading] = useState(false)
 
   const getBaseUrl = () => {
-    return window.location.hostname === 'localhost' 
-      ? 'http://localhost:3001' 
-      : `http://${window.location.hostname}`;
+    return process.env.REACT_APP_API_URL || "http://localhost:3001";
   };
 
   const fetchStatus = async () => {
