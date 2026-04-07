@@ -50,7 +50,7 @@ pipeline {
                         sudo docker-compose up -d --build
                     "
 
-                    echo "===== NOTE: PLEASE ENSURE HOST NGINX PROXIES /boss TO PORT 8080 ====="
+                    echo "===== NOTE: PLEASE ENSURE HOST NGINX PROXIES /boss TO PORT 8081 ====="
                     """
                 }
             }
