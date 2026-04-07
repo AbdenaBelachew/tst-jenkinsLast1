@@ -28,20 +28,23 @@ pipeline {
                     set -e
                     
                     echo "===== PREPARING DIRECTORY ====="
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "mkdir -p /var/boss-app"
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
+                        sudo mkdir -p ${APP_TARGET} &&
+                        sudo chown -R ${SERVER_USER}:${SERVER_USER} ${APP_TARGET}
+                    "
 
                     echo "===== COPYING PROJECT FILES ====="
                     # Sync only necessary files (excluding local node_modules)
-                    rsync -avz --delete --exclude 'node_modules' --exclude 'frontend/node_modules' --exclude 'backend/node_modules' . ${SERVER_USER}@${SERVER_HOST}:/var/boss-app/
+                    rsync -avz --delete --exclude 'node_modules' --exclude 'frontend/node_modules' --exclude 'backend/node_modules' . ${SERVER_USER}@${SERVER_HOST}:${APP_TARGET}/
 
                     echo "===== SETTING UP ENVIRONMENT FILES ====="
-                    echo '${FRONT_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > /var/boss-app/frontend/.env"
-                    echo '${BACK_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > /var/boss-app/backend/.env"
+                    echo '${FRONT_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > ${APP_TARGET}/frontend/.env"
+                    echo '${BACK_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > ${APP_TARGET}/backend/.env"
 
                     echo "===== STARTING CONTAINERS ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
-                        cd /var/boss-app &&
-                        docker-compose up -d --build
+                        cd ${APP_TARGET} &&
+                        sudo docker-compose up -d --build
                     "
 
                     echo "===== NOTE: PLEASE ENSURE HOST NGINX PROXIES /boss TO PORT 8080 ====="
