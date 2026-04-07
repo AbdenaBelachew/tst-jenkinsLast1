@@ -8,7 +8,8 @@ function App() {
   const [loading, setLoading] = useState(false)
 
   const getBaseUrl = () => {
-    return process.env.REACT_APP_API_URL || "http://localhost:3001";
+    // Use relative paths if no API URL is provided, allowing Nginx to handle proxying
+    return process.env.REACT_APP_API_URL || "";
   };
 
   const fetchStatus = async () => {
