@@ -25,8 +25,12 @@ pipeline {
                 echo "📤 Deploying full stack using Docker Compose..."
                 script {
                     echo "===== PREPARING ENVIRONMENT FILES ====="
-                    writeFile file: 'frontend/.env', text: "${FRONT_ENV_FILE}"
-                    writeFile file: 'backend/.env', text: "${BACK_ENV_FILE}"
+                    // Read content of secret files from paths provided by credentials
+                    def frontContent = readFile(FRONT_ENV_FILE)
+                    def backContent = readFile(BACK_ENV_FILE)
+                    
+                    writeFile file: 'frontend/.env', text: frontContent
+                    writeFile file: 'backend/.env', text: backContent
                 }
                 sshagent([env.SSH_CREDS_ID]) {
                     sh """
