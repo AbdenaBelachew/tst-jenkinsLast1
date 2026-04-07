@@ -44,6 +44,9 @@ pipeline {
                     echo "===== STARTING CONTAINERS ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
                         cd ${APP_TARGET} &&
+                        # Stop existing services to free up ports
+                        sudo pm2 delete all || true &&
+                        sudo docker-compose down --remove-orphans || true &&
                         sudo docker-compose up -d --build
                     "
 
