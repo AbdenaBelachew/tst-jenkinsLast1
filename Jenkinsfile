@@ -23,6 +23,11 @@ pipeline {
         stage('Deploy to Server via Docker') {
             steps {
                 echo "📤 Deploying full stack using Docker Compose..."
+                script {
+                    echo "===== PREPARING ENVIRONMENT FILES ====="
+                    writeFile file: 'frontend/.env', text: "${FRONT_ENV_FILE}"
+                    writeFile file: 'backend/.env', text: "${BACK_ENV_FILE}"
+                }
                 sshagent([env.SSH_CREDS_ID]) {
                     sh """
                     set -e
@@ -33,13 +38,9 @@ pipeline {
                         sudo chown -R ${SERVER_USER}:${SERVER_USER} ${APP_TARGET}
                     "
 
-                    echo "===== COPYING PROJECT FILES ====="
+                    echo "===== COPYING PROJECT FILES (including .env) ====="
                     # Sync only necessary files (excluding local node_modules)
                     rsync -avz --delete --exclude 'node_modules' --exclude 'frontend/node_modules' --exclude 'backend/node_modules' . ${SERVER_USER}@${SERVER_HOST}:${APP_TARGET}/
-
-                    echo "===== SETTING UP ENVIRONMENT FILES ====="
-                    echo '${FRONT_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > ${APP_TARGET}/frontend/.env"
-                    echo '${BACK_ENV_FILE}' | ssh ${SERVER_USER}@${SERVER_HOST} "cat > ${APP_TARGET}/backend/.env"
 
                     echo "===== STARTING CONTAINERS ====="
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "
